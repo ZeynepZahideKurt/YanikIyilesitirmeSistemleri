@@ -14,6 +14,7 @@ float IRPWMValue3;
 float IRPWMValue4;
 float LEDPWMValue;
 
+boolean kontrol=false;
 
 int l_calismasure;
 int l_calismabitis;
@@ -21,8 +22,8 @@ boolean l_calisma=false;
 boolean l_calisma_ilk=false;
 int l_periotsure; 
 int l_periotbitis;
-boolean l_periot;
-boolean l_periot_ilk;
+boolean l_periot=false;
+boolean l_periot_ilk=false;
 unsigned long l_yenizaman;
 unsigned long l_simdi;
 boolean l_tiklandi=false;
@@ -52,7 +53,7 @@ const int h2o = 1; //10.pin //tx-mavi kablo
 
 int istenilen_nem;
 float ort_humidity;
-int istenilen_sicaklik;
+float istenilen_sicaklik;
 float ort_cTemp;
 
 // setting PWM properties
@@ -68,8 +69,8 @@ const int IRChannel4 = 11;
 #define Addr2 0x45
 #define I2C_SDA 14
 #define I2C_SCL 15
-const char* ssid = "iPhone";
-const char* password = "11223344";
+const char* ssid = "Enelsis1_EXT";
+const char* password = "1vn6egph";
 /*
 const char* ssid = "Zehra";
 const char* password = "11223344";
@@ -124,7 +125,7 @@ void setup() {
 
   Wire.begin(I2C_SDA, I2C_SCL);
   
- // Serial.begin(115200);
+  Serial.begin(115200);
   ledcSetup(IRChannel1, PWMFrequency, PWMResolation);
   ledcAttachPin(IRPin1, IRChannel1);
   ledcSetup(LEDChannel, PWMFrequency, PWMResolation);
@@ -269,6 +270,57 @@ void o_periotsuref(){
   }
 }
 
+
+void l_calismabitisbelirlef(){
+l_simdi = millis();
+l_calismabitis=l_simdi+(1000*l_calismasure);
+}
+
+void l_calismasuref(){
+  
+      ledcWrite(IRChannel1,IRPWMValue1);
+      ledcWrite(IRChannel2,IRPWMValue2);
+      ledcWrite(IRChannel3,IRPWMValue3);
+      ledcWrite(IRChannel4,IRPWMValue4);
+      l_calisma=true;
+      if(l_calisma_ilk==false){
+        l_calismabitisbelirlef();
+        l_calisma_ilk=true;
+        }
+      l_yenizaman= millis();
+      if(l_yenizaman>=l_calismabitis){
+       l_periotsuref();
+        l_calisma=false;
+        l_calisma_ilk=false;
+        }  
+      
+}
+
+void l_periotbitisbelirlef(){
+l_simdi = millis();
+l_periotbitis=l_simdi+(1000*l_periotsure);
+}
+
+
+void l_periotsuref(){
+  ledcWrite(IRChannel1,0);
+  ledcWrite(IRChannel2,0);
+  ledcWrite(IRChannel3,0);
+  ledcWrite(IRChannel4,0);
+  l_periot=true;
+  if(l_periot_ilk==false){
+    l_periotbitisbelirlef();
+    l_periot_ilk=true;
+    }
+    l_yenizaman= millis();
+  if(l_yenizaman>=l_periotbitis){
+    l_calismasuref();
+    l_periot=false;
+    l_periot_ilk=false;
+  }
+}
+
+
 void handle_message(WebsocketsClient &client, WebsocketsMessage msg)
 {
 if (msg.data().substring(0, 5) == "led1:") {
@@ -318,15 +370,17 @@ if (msg.data().substring(0, 5) == "led1:") {
   }
   
   if (msg.data().substring(0, 4) == "Ldur") {
-    int durma=msg.data().substring(4).toInt(); ////ledlerin durma süresi
+    l_periotsure=msg.data().substring(4).toInt(); ////ledlerin durma süresi
 // Serial.println(durma);
      int bas=msg.data().indexOf('c');
      int son=bas+5;
-     int calis=msg.data().substring(son).toInt(); //ledlerin çalışma süresi
+    l_calismasure=msg.data().substring(son).toInt(); //ledlerin çalışma süresi
+    l_tiklandi=true;
+    l_calisma=true;
     //Serial.println(calis);
   }
    if (msg.data().substring(0, 9) == "sicaklik:") {
-    float istenen=msg.data().substring(9).toFloat(); ////istenilen sıcaklık
+    istenilen_sicaklik=msg.data().substring(9).toFloat(); ////istenilen sıcaklık
  //Serial.println(istenen);
   }
 
@@ -427,11 +481,29 @@ nem1=String(humidity2);
 sicaklik2 = String(cTemp);
 nem2=String(humidity);
 String hepsi=sicaklik1+"/"+nem1+"/"+sicaklik2+"/"+nem2;
-  client.send(hepsi);
-  client.send("sag_nem:"+nem2);
-  client.send("sag_sicaklik:"+sicaklik2);
-  client.send("sol_nem:"+nem1);
-  client.send("sol_sicaklik:"+sicaklik1);
+if(cTemp2>100){
+  client.send("sol_sicaklik:Hata");
+  }
+  else{
+    client.send("sol_sicaklik:"+sicaklik1);
+    }
+  if(cTemp>100){
+     client.send("sag_sicaklik:Hata");
+    }
+    else{
+        client.send("sag_sicaklik:"+sicaklik2);
+      }
+  if(humidity2>100){
+     client.send("sol_nem:Hata");
+    }
+    else{
+      client.send("sol_nem:"+nem1);
+      }
+  if(humidity>100){
+    client.send("sag_nem:Hata");
+    }
+    else{
+  client.send("sag_nem:"+nem2);}
   if(0.00<humidity&&humidity<100.00){
     
     if(0.00<humidity2&&humidity2<100.00){
@@ -450,6 +522,23 @@ String hepsi=sicaklik1+"/"+nem1+"/"+sicaklik2+"/"+nem2;
       //Serial.println("2 sensör de bozuk");
       }
     }
+  if(0.00<cTemp&&cTemp<100.00){
+    
+    if(0.00<cTemp2&&cTemp2<100.00){
+        ort_cTemp=((cTemp+cTemp2)/2);
+      }
+      else{
+        ort_cTemp=cTemp;
+        }
+    }
+    
+   else{
+     if(0.00<cTemp2&&cTemp2<100.00){
+        ort_cTemp=cTemp2;
+      }
+    else{
+     // Serial.println("2 sensör de bozuk");
+      }  
 }
 
 ledcWrite(IRChannel1,IRPWMValue1);
@@ -474,6 +563,36 @@ ledcWrite(IRChannel2,IRPWMValue2);
       
     }
   }
+if(ort_cTemp<istenilen_sicaklik){
+    if(kontrol==false){
+       if(l_tiklandi==true){
+          if(l_calisma==true){
+      
+              l_calismasuref();
+   
+           }else{
+              l_periotsuref();
+      
+                }
+     }
+    }
+    else if(kontrol==true){
+       l_calisma=true;
+       l_calisma_ilk=false;
+       l_periot_ilk=false;
+       kontrol=false;
+              l_calismasuref();
+      }
+  }
+  else{
+    kontrol==true;
+    ledcWrite(IRChannel1,0);
+  ledcWrite(IRChannel2,0);
+  ledcWrite(IRChannel3,0);
+  ledcWrite(IRChannel4,0);
+  }
+  
 
   }
+}
 }
