@@ -14,6 +14,10 @@ float IRPWMValue3;
 float IRPWMValue4;
 float LEDPWMValue;
 
+
+float girilen_min_sicaklik;
+float girilen_max_sicaklik;
+
 boolean kontrol=false;
 
 int l_calismasure;
@@ -125,7 +129,7 @@ void setup() {
 
   Wire.begin(I2C_SDA, I2C_SCL);
   
-  Serial.begin(115200);
+  //Serial.begin(115200);
   ledcSetup(IRChannel1, PWMFrequency, PWMResolation);
   ledcAttachPin(IRPin1, IRChannel1);
   ledcSetup(LEDChannel, PWMFrequency, PWMResolation);
@@ -322,7 +326,9 @@ void l_periotsuref(){
 
 
 void handle_message(WebsocketsClient &client, WebsocketsMessage msg)
-{
+{ 
+  
+  
 if (msg.data().substring(0, 5) == "led1:") {
     IRPWMValue1=msg.data().substring(5).toFloat();
     IRPWMValue1 *= 650;
@@ -403,6 +409,8 @@ void loop() {
   client.onMessage(handle_message);
   client.send("STREAMING");
    while (client.available()) {
+
+    
     client.poll();
     fb = esp_camera_fb_get();
     client.sendBinary((const char *)fb->buf, fb->len);
